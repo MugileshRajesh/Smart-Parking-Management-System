@@ -1,0 +1,76 @@
+Esp32 firmware code
+#include <WiFi.h>
+#include <WebServer.h>
+#include <ArduinoJson.h>
+
+// Replace with your network credentials
+const char* ssid = "YOUR_WIFI_SSID";
+const char* password = "YOUR_WIFI_PASSWORD";
+
+// Create a web server on port 80
+WebServer server(80);
+
+// Pin definitions for the IR sensors
+// Connect the sensor's signal pin to these GPIOs
+const int irSensorPin1 = 34; // GPIO 34
+const int irSensorPin2 = 35; // GPIO 35
+const int irSensorPin3 = 32; // GPIO 32
+const int irSensorPin4 = 33; // GPIO 33
+
+// Function to handle the /status request
+void handleStatus() {
+  // Read the status from the IR sensors
+  // Note: IR sensors can be active HIGH or LOW, adjust the logic below
+  // For most IR obstacle sensors, a HIGH reading means no obstacle (vacant)
+  // and a LOW reading means an obstacle (occupied).
+  bool slot1Occupied = !digitalRead(irSensorPin1);
+  bool slot2Occupied = !digitalRead(irSensorPin2);
+  bool slot3Occupied = !digitalRead(irSensorPin3);
+  bool slot4Occupied = !digitalRead(irSensorPin4);
+
+  // Create a JSON document
+  StaticJsonDocument<200> doc;
+  doc["slots"][0] = slot1Occupied;
+  doc["slots"][1] = slot2Occupied;
+  doc["slots"][2] = slot3Occupied;
+  doc["slots"][3] = slot4Occupied;
+
+  // Serialize JSON to a string
+  String jsonResponse;
+  serializeJson(doc, jsonResponse);
+
+  // Send the JSON response
+  server.send(200, "application/json", jsonResponse);
+}
+
+void setup() {
+  Serial.begin(115200);
+  
+  // Set up the sensor pins as INPUT
+  pinMode(irSensorPin1, INPUT);
+  pinMode(irSensorPin2, INPUT);
+  pinMode(irSensorPin3, INPUT);
+  pinMode(irSensorPin4, INPUT);
+
+  // Connect to Wi-Fi
+  Serial.print("Connecting to ");
+  Serial.println(ssid);
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("");
+  Serial.println("WiFi connected");
+  Serial.print("IP Address: ");
+  Serial.println(WiFi.localIP());
+
+  // Set up the server route
+  server.on("/status", handleStatus);
+  server.begin();
+  Serial.println("HTTP server started");
+}
+
+void loop() {
+  server.handleClient();
+}
